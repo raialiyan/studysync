@@ -1,61 +1,70 @@
+
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { apiRequest } from "../api";
 
 function Register() {
-  const [name, setName] = useState("");
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setError("");
+    setLoading(true);
 
-    console.log("Name:", name);
-    console.log("Email:", email);
-    console.log("Password entered:", password.length > 0);
+    try {
+      await apiRequest("/register", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+
+      alert("Registration successful. Please log in.");
+      navigate("/login");
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div>
-      <h2>Create an account</h2>
+      <h2>Create StudySync Account</h2>
 
       <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="name">Full Name</label>
-
+          <label>Email</label>
           <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-        </div>
-
-        <div>
-          <label htmlFor="email">Email</label>
-
-          <input
-            id="email"
             type="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
 
         <div>
-          <label htmlFor="password">Password</label>
-
+          <label>Password</label>
           <input
-            id="password"
             type="password"
+            minLength={8}
+            maxLength={128}
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
         </div>
 
-        <button type="submit">Register</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Registering..." : "Register"}
+        </button>
       </form>
+
+      {error && <p role="alert" style={{ color: "red" }}>{error}</p>}
     </div>
   );
 }

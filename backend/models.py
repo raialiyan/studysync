@@ -1,8 +1,13 @@
+
 from sqlalchemy import String, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
 
+
+# ==========================================
+# USER
+# ==========================================
 
 class User(Base):
     __tablename__ = "users"
@@ -21,18 +26,24 @@ class User(Base):
         String(255),
         nullable=False
     )
-    memberships: Mapped[list["Membership"]] = relationship( 
-    back_populates="user",
-    cascade="all, delete-orphan")
+
+    memberships: Mapped[list["Membership"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
 
     assigned_tasks: Mapped[list["Task"]] = relationship(
-    back_populates="assignee")
+        back_populates="assignee"
+    )
 
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="author"
-        )
+    )
 
 
+# ==========================================
+# WORKSPACE
+# ==========================================
 
 class Workspace(Base):
     __tablename__ = "workspaces"
@@ -50,6 +61,17 @@ class Workspace(Base):
         back_populates="workspace",
         cascade="all, delete-orphan"
     )
+
+    # A workspace can contain multiple modules
+    modules: Mapped[list["Module"]] = relationship(
+        back_populates="workspace",
+        cascade="all, delete-orphan"
+    )
+
+
+# ==========================================
+# MEMBERSHIP
+# ==========================================
 
 class Membership(Base):
     __tablename__ = "memberships"
@@ -90,10 +112,10 @@ class Membership(Base):
         back_populates="memberships"
     )
 
-    modules: Mapped[list["Module"]] = relationship(
-    back_populates="workspace",
-    cascade="all, delete-orphan"
-)
+
+# ==========================================
+# MODULE
+# ==========================================
 
 class Module(Base):
     __tablename__ = "modules"
@@ -120,6 +142,11 @@ class Module(Base):
         back_populates="module",
         cascade="all, delete-orphan"
     )
+
+
+# ==========================================
+# TASK
+# ==========================================
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -167,6 +194,10 @@ class Task(Base):
         cascade="all, delete-orphan"
     )
 
+
+# ==========================================
+# COMMENT
+# ==========================================
 
 class Comment(Base):
     __tablename__ = "comments"

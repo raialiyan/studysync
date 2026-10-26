@@ -1,47 +1,68 @@
+
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { apiRequest, saveToken } from "../api";
 
 function Login() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
+    setError("");
+    setLoading(true);
 
-    console.log("Email:", email);
-    console.log("Password entered:", password.length > 0);
+    try {
+      const data = await apiRequest("/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+
+      saveToken(data.access_token);
+      navigate("/workspaces");
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div>
-      <h2>Log In</h2>
+      <h2>Login to StudySync</h2>
 
       <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="email">Email</label>
-
+          <label>Email</label>
           <input
-            id="email"
             type="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
 
         <div>
-          <label htmlFor="password">Password</label>
-
+          <label>Password</label>
           <input
-            id="password"
             type="password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
         </div>
 
-        <button type="submit">Log In</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Logging in..." : "Login"}
+        </button>
       </form>
+
+      {error && <p role="alert" style={{ color: "red" }}>{error}</p>}
     </div>
   );
 }
