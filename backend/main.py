@@ -455,3 +455,12 @@ def delete_module(
 
     db.delete(module)
     db.commit()
+
+
+# Week 3 feature routes
+from week3_api import router as week3_router
+app.include_router(week3_router)
+
+# Week 3 authenticated real-time notifications
+from week3_realtime import router as week3_realtime_router
+app.include_router(week3_realtime_router)
