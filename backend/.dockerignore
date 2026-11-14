@@ -1,0 +1,17 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+.env
+.env.*
+!.env.production.example
+*.sqlite
+*.db
+*.dump
+*.sql
+*.backup
+*.pre_*_backup
+main.py.pre_*
+.git/

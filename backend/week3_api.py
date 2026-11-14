@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from auth import get_current_user
 from database import Base, get_db
 from models import Comment, Membership, Module, Task, User
+from week3_realtime import publish_workspace_change
 
 router = APIRouter(tags=["Week 3: tasks and collaboration"])
 TaskStatus = Literal["todo", "in_progress", "done"]
@@ -122,6 +123,7 @@ def create_task(module_id: int, data: TaskCreate, db: Session = Depends(get_db),
     if data.assigned_to_id is not None:
         record_event(db, module.workspace_id, user.id, "task_assigned", "task", task.id, {"assigned_to_id": data.assigned_to_id})
     db.commit()
+    publish_workspace_change(module.workspace_id)
     db.refresh(task)
     return task
 
@@ -162,6 +164,7 @@ def update_task(task_id: int, data: TaskUpdate, db: Session = Depends(get_db), u
         else:
             record_event(db, module.workspace_id, user.id, "task_updated", "task", task.id, {"field": field})
     db.commit()
+    publish_workspace_change(module.workspace_id)
     db.refresh(task)
     return task
 
@@ -172,6 +175,7 @@ def delete_task(task_id: int, db: Session = Depends(get_db), user: User = Depend
     record_event(db, module.workspace_id, user.id, "task_deleted", "task", task.id, {"title": task.title})
     db.delete(task)
     db.commit()
+    publish_workspace_change(module.workspace_id)
 
 
 @router.post("/tasks/{task_id}/comments", response_model=CommentResponse, status_code=201)
@@ -185,6 +189,7 @@ def add_comment(task_id: int, data: CommentCreate, db: Session = Depends(get_db)
     db.flush()
     record_event(db, module.workspace_id, user.id, "comment_added", "comment", comment.id, {"task_id": task_id})
     db.commit()
+    publish_workspace_change(module.workspace_id)
     db.refresh(comment)
     return comment
 
@@ -206,6 +211,7 @@ def delete_comment(comment_id: int, db: Session = Depends(get_db), user: User = 
     record_event(db, module.workspace_id, user.id, "comment_deleted", "comment", comment.id, {"task_id": comment.task_id})
     db.delete(comment)
     db.commit()
+    publish_workspace_change(module.workspace_id)
 
 
 @router.get("/workspaces/{workspace_id}/activity", response_model=list[ActivityResponse])

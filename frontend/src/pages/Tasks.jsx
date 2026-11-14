@@ -3,7 +3,7 @@ import { apiRequest, getToken } from '../api';
 
 const statuses = ['todo', 'in_progress', 'done'];
 const labels = { todo: 'To do', in_progress: 'In progress', done: 'Done' };
-const socketUrl = `ws://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8000`;
+const socketUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8000`;
 
 export default function Tasks() {
   const [workspaces, setWorkspaces] = useState([]);
@@ -22,6 +22,9 @@ export default function Tasks() {
   const [busy, setBusy] = useState(false);
   const [connection, setConnection] = useState('Disconnected');
   const socketRef = useRef(null);
+  const moduleIdRef = useRef('');
+  const openCommentsRef = useRef(new Set());
+  useEffect(() => { moduleIdRef.current = moduleId; }, [moduleId]);
 
   useEffect(() => {
     apiRequest('/workspaces').then(setWorkspaces).catch(e => setError(e.message));
@@ -45,11 +48,13 @@ export default function Tasks() {
   }, []);
 
   useEffect(() => {
+    openCommentsRef.current.clear();
     setModuleId(''); setTasks([]); setComments({}); setModules([]); setMembers([]); setActivity([]);
     if (workspaceId) loadWorkspace(workspaceId).catch(e => setError(e.message));
   }, [workspaceId, loadWorkspace]);
 
   useEffect(() => {
+    openCommentsRef.current.clear();
     setComments({}); setTasks([]);
     if (moduleId) loadTasks(moduleId).catch(e => setError(e.message));
   }, [moduleId, loadTasks]);
@@ -73,8 +78,13 @@ export default function Tasks() {
         if (message.type === 'refresh') {
           try {
             await loadWorkspace(workspaceId);
-            if (moduleId) await loadTasks(moduleId);
-            setComments({});
+            if (moduleIdRef.current) await loadTasks(moduleIdRef.current);
+            const openTasks = [...openCommentsRef.current];
+            const fetched = await Promise.all(openTasks.map(async taskId => {
+              try { return [taskId, await apiRequest(`/tasks/${taskId}/comments`)]; }
+              catch { return [taskId, []]; }
+            }));
+            if (!disposed) setComments(prev => ({ ...prev, ...Object.fromEntries(fetched) }));
           } catch (e) { setError(e.message); }
         }
       };
@@ -93,7 +103,7 @@ export default function Tasks() {
       ws?.close();
       if (socketRef.current === ws) socketRef.current = null;
     };
-  }, [workspaceId, moduleId, loadWorkspace, loadTasks]);
+  }, [workspaceId, loadWorkspace, loadTasks]);
 
   async function mutate(action) {
     setError(''); setBusy(true);
@@ -101,8 +111,6 @@ export default function Tasks() {
       const value = await action();
       if (workspaceId) await loadWorkspace(workspaceId);
       if (moduleId) await loadTasks(moduleId);
-      if (socketRef.current?.readyState === WebSocket.OPEN)
-        socketRef.current.send(JSON.stringify({ type: 'refresh' }));
       return value;
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -128,6 +136,7 @@ export default function Tasks() {
   }
 
   async function showComments(taskId) {
+    openCommentsRef.current.add(taskId);
     try {
       const value = await apiRequest(`/tasks/${taskId}/comments`);
       setComments(prev => ({ ...prev, [taskId]: value }));
