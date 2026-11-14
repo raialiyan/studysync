@@ -1,5 +1,15 @@
-function Dashboard() {
-    return <h2>Dashboard</h2>
-  }
-  
-  export default Dashboard
+import {useEffect,useState} from 'react';
+import {Link} from 'react-router-dom';
+import {apiRequest} from '../api';
+export default function Dashboard(){
+ const [spaces,setSpaces]=useState([]),[user,setUser]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+ useEffect(()=>{let on=true;Promise.all([apiRequest('/workspaces'),apiRequest('/users/me')]).then(([a,b])=>{if(on){setSpaces(a);setUser(b)}}).catch(e=>{if(on)setError(e.message)}).finally(()=>{if(on)setLoading(false)});return()=>{on=false}},[]);
+ const name=user?.email?.split('@')[0]||'there';
+ return <div className="page-content"><div className="eyebrow">YOUR STUDY HUB <span className="eyebrow-dot"/> OVERVIEW</div><div className="page-heading"><div><h1>Welcome back, <span className="heading-accent">{name}.</span></h1><p>Here’s your space to focus, collaborate and make progress.</p></div><Link className="btn btn-primary" to="/workspaces">+ New workspace</Link></div>
+ {error&&<div className="notice error" role="alert">{error}</div>}
+ <section className="hero-panel"><div className="hero-copy"><div className="hero-tag">✦ THE BETTER WAY TO STUDY</div><h2>Less organising.<br/><em>More achieving.</em></h2><p>Bring your team, modules and tasks together in one calm workspace.</p><Link className="btn btn-white" to="/tasks">Open task board <span>↗</span></Link></div><div className="hero-art" aria-hidden="true"><div className="art-orbit orbit-one"/><div className="art-orbit orbit-two"/><div className="art-card art-card-one"><span>✓</span><div><i/><i/></div></div><div className="art-card art-card-two"><span>✦</span><div><i/><i/></div></div><div className="art-spark">✳</div></div></section>
+ <section className="stats-grid"><div className="stat-card"><span>YOUR WORKSPACES</span><strong>{loading?'—':spaces.length}</strong><small>Shared study spaces</small><div className="stat-icon">▤</div></div><div className="stat-card"><span>STAY ORGANISED</span><strong>01</strong><small>One place for everything</small><div className="stat-icon">✦</div></div><div className="stat-card"><span>LIVE COLLABORATION</span><strong>24/7</strong><small>Updates as they happen</small><div className="stat-icon">◉</div></div></section>
+ <div className="section-heading"><div><span className="eyebrow">PICK UP WHERE YOU LEFT OFF</span><h2>Your workspaces</h2></div><Link to="/workspaces" className="text-link">View all <span>↗</span></Link></div>
+ <div className="workspace-grid">{spaces.slice(0,6).map((s,i)=><Link to="/workspaces" className="workspace-tile" key={s.id}><div className={'tile-icon color-'+(i%4)}>{s.name?.charAt(0)?.toUpperCase()||'W'}</div><div><h3>{s.name}</h3><p>Open workspace and modules</p></div><span className="tile-arrow">↗</span></Link>)}{!loading&&!spaces.length&&<div className="empty-block"><span className="empty-icon">✳</span><h3>Your next great study session starts here</h3><p>Create your first workspace to organise modules and collaborate.</p><Link className="btn btn-primary" to="/workspaces">Create workspace</Link></div>}</div>
+ </div>
+}

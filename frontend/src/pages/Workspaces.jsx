@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiRequest, getToken, logout } from "../api";
+import { apiRequest, getToken } from "../api";
 
 function Workspaces() {
   const navigate = useNavigate();
@@ -149,118 +149,17 @@ function Workspaces() {
     }
   }
 
-  function handleLogout() {
-    logout();
-    navigate("/login", { replace: true });
-  }
 
-  if (loading) {
-    return <p>Loading workspaces...</p>;
-  }
-
-  return (
-    <div>
-      <h2>My Workspaces</h2>
-
-      <button onClick={handleLogout}>Logout</button>
-
-      {error && (
-        <p role="alert" style={{ color: "red" }}>{error}</p>
-      )}
-
-      <h3>Create Workspace</h3>
-
-      <form onSubmit={createWorkspace}>
-        <input
-          type="text"
-          placeholder="Workspace name"
-          value={workspaceName}
-          onChange={(e) => setWorkspaceName(e.target.value)}
-          required
-          maxLength={255}
-        />
-
-        <button type="submit">Create</button>
-      </form>
-
-      <h3>Your Workspaces</h3>
-
-      {workspaces.length === 0 && (
-        <p>No workspaces yet. Create your first one!</p>
-      )}
-
-      {workspaces.map((workspace) => (
-        <div className="card" key={workspace.id}>
-          <h4>{workspace.name}</h4>
-
-          <button
-            onClick={() => selectWorkspace(workspace)}
-          >
-            Open Workspace
-          </button>
-        </div>
-      ))}
-
-      {selectedWorkspace && (
-        <section>
-          <hr />
-
-          <h3>{selectedWorkspace.name}</h3>
-          <div className="card" style={{ maxWidth: 650, margin: "16px auto", padding: 18, textAlign: "left" }}>
-            <h4>Workspace members</h4>
-            <p style={{ fontSize: 14 }}>Invite an existing StudySync user by their registered email. Only the workspace owner can add or remove members.</p>
-            {members.length === 0 ? <p>No members loaded.</p> : (
-              <ul style={{ paddingLeft: 20 }}>
-                {members.map(member => (
-                  <li key={member.user_id} style={{ marginBottom: 8 }}>
-                    {member.email} — {member.role}
-                    {members.some(m => m.user_id === myUserId && m.role === "owner") && member.role !== "owner" && (
-                      <button type="button" disabled={memberBusy} onClick={() => removeMember(member)} style={{ marginLeft: 10 }}>Remove</button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {members.some(m => m.user_id === myUserId && m.role === "owner") && (
-              <form onSubmit={addMember} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input type="email" aria-label="New member email" placeholder="Registered user's email"
-                  value={memberEmail} onChange={e => setMemberEmail(e.target.value)} required
-                  style={{ flex: "1 1 210px", minWidth: 0, padding: 8 }} />
-                <button type="submit" disabled={memberBusy}>{memberBusy ? "Adding..." : "Add Member"}</button>
-              </form>
-            )}
-            {memberSuccess && <p role="status" style={{ color: "#6ac69a" }}>{memberSuccess}</p>}
-          </div>
-          <h4>Modules</h4>
-
-          <form onSubmit={createModule}>
-            <input
-              type="text"
-              placeholder="Module name"
-              value={moduleName}
-              onChange={(e) => setModuleName(e.target.value)}
-              required
-              maxLength={255}
-            />
-
-            <button type="submit">
-              Add Module
-            </button>
-          </form>
-
-          {modules.length === 0 && (
-            <p>No modules yet.</p>
-          )}
-
-          {modules.map((module) => (
-            <div className="card" key={module.id}>
-              <strong>{module.name}</strong>
-            </div>
-          ))}
-        </section>
-      )}
-    </div>
-  );
+  const isOwner=members.some(m=>m.user_id===myUserId&&m.role==='owner');
+  return <div className="page-content"><div className="eyebrow">YOUR COLLABORATIVE SPACE <span className="eyebrow-dot"/> WORKSPACES</div>
+  <div className="page-heading"><div><h1>Workspaces<span className="heading-accent">.</span></h1><p>Keep your study groups and course modules beautifully organised.</p></div><span className="count-pill">{loading?'…':workspaces.length} spaces</span></div>
+  {error&&<div className="notice error" role="alert">{error}</div>}
+  <div className="two-column-layout"><section><div className="panel"><div className="panel-heading"><div><span className="eyebrow">START SOMETHING NEW</span><h2>Create workspace</h2></div><span className="panel-symbol">＋</span></div><form onSubmit={createWorkspace} className="inline-form"><input aria-label="Workspace name" placeholder="e.g. Software Engineering Group" maxLength={255} required value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)}/><button className="btn btn-primary" type="submit">Create <span>↗</span></button></form></div>
+  <div className="section-heading compact"><div><span className="eyebrow">ALL YOUR SPACES</span><h2>My workspaces</h2></div></div>
+  {loading?<div className="panel muted">Loading your workspaces…</div>:workspaces.length===0?<div className="empty-block"><span className="empty-icon">▤</span><h3>Nothing here yet</h3><p>Create a workspace above and your group can get started.</p></div>:<div className="stack-list">{workspaces.map((space,i)=><button key={space.id} className={'space-row '+(selectedWorkspace?.id===space.id?'selected':'')} onClick={()=>selectWorkspace(space)}><span className={'tile-icon color-'+(i%4)}>{space.name?.charAt(0)?.toUpperCase()||'W'}</span><span className="space-row-copy"><strong>{space.name}</strong><small>Workspace · Open details</small></span><span className="space-row-arrow">↗</span></button>)}</div>}</section>
+  <section>{selectedWorkspace?<><div className="panel"><div className="panel-heading"><div><span className="eyebrow">SELECTED WORKSPACE</span><h2>{selectedWorkspace.name}</h2><p className="muted">Manage the people and modules in your space.</p></div><span className="panel-symbol">✳</span></div>
+  <div className="subheading"><h3>Modules <span className="mini-counter">{modules.length}</span></h3></div><form onSubmit={createModule} className="inline-form"><input aria-label="Module name" placeholder="Add a module (e.g. COMP30040)" maxLength={255} required value={moduleName} onChange={e=>setModuleName(e.target.value)}/><button className="btn btn-secondary" type="submit">Add +</button></form>
+  <div className="module-list">{modules.map(m=><div key={m.id} className="module-row"><span className="module-icon">▦</span><strong>{m.name}</strong><button className="link-button" onClick={()=>navigate('/tasks')} type="button">Open board ↗</button></div>)}{!modules.length&&<p className="muted empty-inline">No modules yet. Add one to start tracking tasks.</p>}</div></div>
+  <div className="panel"><div className="panel-heading"><div><span className="eyebrow">STUDY TOGETHER</span><h2>Team members <span className="mini-counter">{members.length}</span></h2></div><span className="panel-symbol">♧</span></div><p className="muted">Add people who already have StudySync accounts.</p><div className="member-list">{members.map(m=><div className="member-row" key={m.user_id}><span className="avatar">{m.email?.charAt(0).toUpperCase()}</span><span className="member-copy"><strong>{m.email}</strong><small>{m.role}</small></span>{isOwner&&m.role!=='owner'&&<button disabled={memberBusy} type="button" className="link-button destructive" onClick={()=>removeMember(m)}>Remove</button>}</div>)}</div>{isOwner&&<form className="inline-form" onSubmit={addMember}><input type="email" aria-label="New member email" placeholder="teammate@university.ac.uk" required value={memberEmail} onChange={e=>setMemberEmail(e.target.value)}/><button className="btn btn-secondary" disabled={memberBusy} type="submit">{memberBusy?'Adding…':'Invite +'}</button></form>}{memberSuccess&&<div className="notice success" role="status">{memberSuccess}</div>}</div></>:<div className="panel selection-panel"><div className="selection-illustration" aria-hidden="true">✳</div><span className="eyebrow">YOUR WORKSPACE DETAILS</span><h2>Everything in its place.</h2><p>Choose a workspace on the left to manage modules, invite members and jump into your task board.</p><div className="selection-foot">↖ Select a workspace to get started</div></div>}</section></div></div>;
 }
-
 export default Workspaces;

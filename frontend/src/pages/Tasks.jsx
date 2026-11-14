@@ -3,7 +3,7 @@ import { apiRequest, getToken } from '../api';
 
 const statuses = ['todo', 'in_progress', 'done'];
 const labels = { todo: 'To do', in_progress: 'In progress', done: 'Done' };
-const socketUrl = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8000`;
+const socketUrl = (import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/^http/, 'ws') : `ws://${window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname}:8000`)).replace(/\/$/, '');
 
 export default function Tasks() {
   const [workspaces, setWorkspaces] = useState([]);
@@ -20,6 +20,8 @@ export default function Tasks() {
   const [assignee, setAssignee] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [filter,setFilter]=useState('all');
+  const [showComposer,setShowComposer]=useState(false);
   const [connection, setConnection] = useState('Disconnected');
   const socketRef = useRef(null);
   const moduleIdRef = useRef('');
@@ -160,81 +162,15 @@ export default function Tasks() {
     await showComments(taskId);
   }
 
-  return (
-    <div style={{ maxWidth: 950, margin: '0 auto' }}>
-      <h2>Tasks and collaboration</h2>
-      <p>Real-time connection: {connection}</p>
-      {error && <p role="alert" style={{ color: 'crimson' }}>{error}</p>}
-      <label>Workspace{' '}
-        <select value={workspaceId} onChange={e => setWorkspaceId(e.target.value)}>
-          <option value="">Select workspace</option>
-          {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-      </label>{' '}
-      <label>Module{' '}
-        <select value={moduleId} disabled={!workspaceId} onChange={e => setModuleId(e.target.value)}>
-          <option value="">Select module</option>
-          {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </label>
-      {workspaceId && modules.length === 0 && <p>No modules yet. Create one on the Workspaces page.</p>}
-      {moduleId && <>
-        <h3>Create task</h3>
-        <form onSubmit={createTask} style={{ display: 'grid', gap: 8, marginBottom: 24 }}>
-          <input aria-label="Task title" placeholder="Task title" required maxLength={255} value={title} onChange={e => setTitle(e.target.value)} />
-          <input aria-label="Task description" placeholder="Description (optional)" maxLength={1000} value={description} onChange={e => setDescription(e.target.value)} />
-          <label>Assign to{' '}
-            <select value={assignee} onChange={e => setAssignee(e.target.value)}>
-              <option value="">Unassigned</option>
-              {members.map(m => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}
-            </select>
-          </label>
-          <button disabled={busy} type="submit">Create task</button>
-        </form>
-        <h3>Tasks ({tasks.length})</h3>
-        {tasks.length === 0 && <p>No tasks in this module yet.</p>}
-        {tasks.map(task => <div key={task.id} className="card" style={{ marginBottom: 12 }}>
-          <h4>{task.title}</h4>
-          {task.description && <p>{task.description}</p>}
-          <label>Status{' '}
-            <select disabled={busy} value={task.status} onChange={e => patchTask(task.id, { status: e.target.value })}>
-              {statuses.map(s => <option key={s} value={s}>{labels[s]}</option>)}
-            </select>
-          </label>{' '}
-          <label>Assigned to{' '}
-            <select disabled={busy} value={task.assigned_to_id ?? ''} onChange={e => patchTask(task.id, { assigned_to_id: e.target.value ? Number(e.target.value) : null })}>
-              <option value="">Unassigned</option>
-              {members.map(m => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}
-            </select>
-          </label>{' '}
-          <button disabled={busy} onClick={() => {
-            const edited = window.prompt('New task title', task.title);
-            if (edited !== null) patchTask(task.id, { title: edited });
-          }}>Rename</button>{' '}
-          <button disabled={busy} onClick={() => {
-            const edited = window.prompt('New description', task.description || '');
-            if (edited !== null) patchTask(task.id, { description: edited });
-          }}>Edit description</button>{' '}
-          <button disabled={busy} onClick={() => deleteTask(task.id)}>Delete</button>
-          <div style={{ marginTop: 12 }}>
-            <button onClick={() => showComments(task.id)}>View / refresh comments</button>
-            {(comments[task.id] || []).map(c => <div key={c.id} style={{ padding: 5 }}>
-              <span>{members.find(m => m.user_id === c.user_id)?.email || `User ${c.user_id}`}: {c.content}</span>{' '}
-              <button disabled={busy} onClick={() => deleteComment(task.id, c.id)}>Delete</button>
-            </div>)}
-            <input aria-label={`Comment on ${task.title}`} placeholder="Write a comment" maxLength={2000}
-              value={newComments[task.id] || ''} onChange={e => setNewComments(p => ({ ...p, [task.id]: e.target.value }))} />{' '}
-            <button disabled={busy} onClick={() => addComment(task.id)}>Comment</button>
-          </div>
-        </div>)}
-      </>}
-      {workspaceId && <section>
-        <h3>Workspace activity</h3>
-        {activity.length === 0 && <p>No activity recorded yet.</p>}
-        <ul>{activity.slice(0, 20).map(a => <li key={a.id}>
-          {a.event_type.replaceAll('_', ' ')} — {a.entity_type} #{a.entity_id} ({new Date(a.created_at).toLocaleString()})
-        </li>)}</ul>
-      </section>}
-    </div>
-  );
+  const filteredTasks = tasks.filter(t=>filter==='all'||t.status===filter);
+  const counts={all:tasks.length,todo:tasks.filter(t=>t.status==='todo').length,in_progress:tasks.filter(t=>t.status==='in_progress').length,done:tasks.filter(t=>t.status==='done').length};
+  return <div className="page-content"><div className="eyebrow">FOCUS MODE <span className="eyebrow-dot"/> TASK BOARD</div><div className="page-heading"><div><h1>Task board<span className="heading-accent">.</span></h1><p>Every small step adds up. Stay focused and keep things moving.</p></div><span className={'connection-pill '+(connection==='Connected'?'online':'')}><i/>{connection==='Connected'?'Live collaboration':connection}</span></div>
+  {error&&<div className="notice error" role="alert">{error}</div>}
+  <div className="panel picker-panel"><div className="picker-field"><label htmlFor="task-workspace">WORKSPACE</label><select id="task-workspace" value={workspaceId} onChange={e=>setWorkspaceId(e.target.value)}><option value="">Choose a workspace</option>{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></div><span className="picker-divider">/</span><div className="picker-field"><label htmlFor="task-module">MODULE</label><select id="task-module" value={moduleId} disabled={!workspaceId} onChange={e=>setModuleId(e.target.value)}><option value="">Choose a module</option>{modules.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></div></div>
+  {!workspaceId?<div className="empty-block empty-large"><span className="empty-icon">▦</span><h2>Ready when you are.</h2><p>Choose a workspace above to see your tasks, teammates and live activity.</p></div>:modules.length===0?<div className="empty-block empty-large"><span className="empty-icon">▤</span><h2>First, make a module.</h2><p>Go to Workspaces and add a module to organise your tasks.</p><a href="/workspaces" className="btn btn-primary">Go to workspaces ↗</a></div>:!moduleId?<div className="empty-block empty-large"><span className="empty-icon">✳</span><h2>Pick a module.</h2><p>Select one of your modules above to open its task board.</p></div>:<>
+  <div className="task-stats">{[['all','All tasks'],['todo','To do'],['in_progress','In progress'],['done','Completed']].map(([key,name])=><button key={key} className={'task-stat '+(filter===key?'active':'')} onClick={()=>setFilter(key)}><span>{name}</span><strong>{counts[key]}</strong><small>{key==='all'?'Your full board':key==='done'?'Keep it up!':'Click to filter'} <span>↗</span></small></button>)}</div>
+  <div className="task-layout"><section><div className="section-heading compact"><div><span className="eyebrow">MAKE PROGRESS</span><h2>{filter==='all'?'All tasks':labels[filter]} <span className="mini-counter">{filteredTasks.length}</span></h2></div><button type="button" className="btn btn-primary" onClick={()=>setShowComposer(v=>!v)}>{showComposer?'Close form':'＋ New task'}</button></div>
+  {showComposer&&<form onSubmit={createTask} className="panel composer"><h3>Create a task</h3><label>Task name<input aria-label="Task title" placeholder="What needs to get done?" required maxLength={255} value={title} onChange={e=>setTitle(e.target.value)}/></label><label>Description<input aria-label="Task description" placeholder="Add a little context (optional)" maxLength={1000} value={description} onChange={e=>setDescription(e.target.value)}/></label><label>Assign to<select value={assignee} onChange={e=>setAssignee(e.target.value)}><option value="">Unassigned</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{m.email}</option>)}</select></label><button disabled={busy} className="btn btn-primary">{busy?'Saving…':'Create task →'}</button></form>}
+  <div className="tasks-stack">{filteredTasks.map(t=><article key={t.id} className="task-item"><div className="task-item-top"><span className={'status-badge status-'+t.status}><i/>{labels[t.status]||t.status}</span><div className="task-tools"><button disabled={busy} title="Rename task" aria-label={'Rename '+t.title} onClick={()=>{const v=window.prompt('New task title',t.title);if(v!==null&&v.trim())patchTask(t.id,{title:v.trim()})}}>✎</button><button disabled={busy} title="Edit description" aria-label={'Edit description for '+t.title} onClick={()=>{const v=window.prompt('New description',t.description||'');if(v!==null)patchTask(t.id,{description:v})}}>☰</button><button disabled={busy} title="Delete task" aria-label={'Delete '+t.title} className="destructive" onClick={()=>deleteTask(t.id)}>×</button></div></div><h3>{t.title}</h3>{t.description&&<p className="task-description">{t.description}</p>}<div className="task-item-fields"><label>STATUS<select disabled={busy} value={t.status} onChange={e=>patchTask(t.id,{status:e.target.value})}>{statuses.map(s=><option key={s} value={s}>{labels[s]}</option>)}</select></label><label>ASSIGNEE<select disabled={busy} value={t.assigned_to_id??''} onChange={e=>patchTask(t.id,{assigned_to_id:e.target.value?Number(e.target.value):null})}><option value="">Unassigned</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{m.email}</option>)}</select></label></div><div className="task-comments"><button className="comment-toggle" onClick={()=>showComments(t.id)}>♧ {comments[t.id]?'Comments · '+comments[t.id].length:'View comments'} <span>↗</span></button>{comments[t.id]&&<div className="comment-list">{comments[t.id].map(c=><div className="comment-row" key={c.id}><span className="avatar small">{(members.find(m=>m.user_id===c.user_id)?.email||'?').charAt(0).toUpperCase()}</span><div><strong>{members.find(m=>m.user_id===c.user_id)?.email||'Member'}</strong><p>{c.content}</p></div><button disabled={busy} title="Delete comment" className="comment-delete" onClick={()=>deleteComment(t.id,c.id)}>×</button></div>)}</div>}<div className="comment-form"><input aria-label={'Comment on '+t.title} placeholder="Write a comment…" maxLength={2000} value={newComments[t.id]||''} onChange={e=>setNewComments(p=>({...p,[t.id]:e.target.value}))} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addComment(t.id)}}}/><button disabled={busy||!(newComments[t.id]||'').trim()} type="button" onClick={()=>addComment(t.id)}>Send ↗</button></div></div></article>)}{!filteredTasks.length&&<div className="empty-block"><span className="empty-icon">✓</span><h3>All clear here</h3><p>{filter==='all'?'Create your first task to start making progress.':'No tasks in this category yet.'}</p>{!showComposer&&<button className="btn btn-primary" onClick={()=>setShowComposer(true)}>＋ Create task</button>}</div>}</div></section>
+  <aside className="activity-panel panel"><span className="eyebrow">STAY IN THE LOOP</span><h2>Recent activity</h2><p className="muted">See what's happening in your study group.</p>{activity.length?<div className="activity-timeline">{activity.slice(0,20).map(a=><div className="activity-event" key={a.id}><span className="activity-pin"/><div><strong>{a.event_type.replaceAll('_',' ')}</strong><p>{a.entity_type} #{a.entity_id}</p><time>{new Date(a.created_at).toLocaleString()}</time></div></div>)}</div>:<div className="activity-empty">✦<p>Activity from your team will appear here.</p></div>}</aside></div></>}</div>;
 }
